@@ -21,21 +21,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.example.testtcgpocket.R
+import kotlin.math.abs
 
 const val MIN_ROTATION = -5f
 const val MAX_ROTATION = 5f
 const val CARD_WIDTH_RATIO = 2.5f
 const val CARD_HEIGHT_RATIO = 3.5f
+const val OVERLAY_JITTER = 100f
 
 @Composable
 fun CardComponent(modifier: Modifier = Modifier) {
@@ -98,6 +106,8 @@ fun CardComponent(modifier: Modifier = Modifier) {
         label = "rotationX",
     )
 
+    val overlay = ImageBitmap.imageResource(id = R.drawable.overlay)
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -118,6 +128,43 @@ fun CardComponent(modifier: Modifier = Modifier) {
                 .aspectRatio(CARD_WIDTH_RATIO / CARD_HEIGHT_RATIO)
                 .padding(32.dp)
                 .clip(RoundedCornerShape(15.dp))
+                .drawWithCache {
+                    onDrawWithContent {
+                        drawContent()
+                        val absoluteRotationX = abs(animatedRotationX)
+                        val absoluteRotationY = abs(animatedRotationY)
+
+                        val overlayAlpha = (absoluteRotationX + absoluteRotationY).interpolateRange(
+                            initialRange = 0f..MAX_ROTATION * 2f,
+                            finalRange = 0f..1f
+                        )
+
+                        val xOffset = animatedRotationX.interpolateRange(
+                            initialRange = MIN_ROTATION..MAX_ROTATION,
+                            finalRange = -OVERLAY_JITTER..OVERLAY_JITTER
+                        ).toInt()
+                        val yOffset = animatedRotationY.interpolateRange(
+                            initialRange = MIN_ROTATION..MAX_ROTATION,
+                            finalRange = -OVERLAY_JITTER..OVERLAY_JITTER
+                        ).toInt()
+
+                        val overlayOffset = IntOffset(
+                            x = xOffset - OVERLAY_JITTER.toInt(),
+                            y = yOffset - OVERLAY_JITTER.toInt(),
+                        )
+
+                        drawImage(
+                            image = overlay,
+                            alpha = overlayAlpha,
+                            dstOffset = overlayOffset,
+                            dstSize = IntSize(
+                                width = size.width.toInt() + OVERLAY_JITTER.toInt() * 2,
+                                height = size.height.toInt() + OVERLAY_JITTER.toInt() * 2,
+                            ),
+                            blendMode = BlendMode.Overlay,
+                        )
+                    }
+                }
         )
         Column(
             modifier = Modifier.align(alignment = Alignment.BottomCenter)
