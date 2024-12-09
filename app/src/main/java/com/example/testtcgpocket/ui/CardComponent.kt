@@ -1,5 +1,7 @@
 package com.example.testtcgpocket.ui
 
+import android.os.Build
+import android.view.View
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -28,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.imageResource
@@ -36,6 +39,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.example.testtcgpocket.R
 import kotlin.math.abs
 
@@ -113,59 +117,67 @@ fun CardComponent(modifier: Modifier = Modifier) {
             .fillMaxSize()
             .background(color = Color.Black),
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.card),
-            contentScale = ContentScale.FillBounds,
-            contentDescription = "card",
-            modifier = Modifier
-                .graphicsLayer(
-                    rotationX = animatedRotationX,
-                    rotationY = animatedRotationY,
-                )
-                .transformable(state = transformState)
-                .align(alignment = Alignment.Center)
-                .fillMaxSize()
-                .aspectRatio(CARD_WIDTH_RATIO / CARD_HEIGHT_RATIO)
-                .padding(32.dp)
-                .clip(RoundedCornerShape(15.dp))
-                .drawWithCache {
-                    onDrawWithContent {
-                        drawContent()
-                        val absoluteRotationX = abs(animatedRotationX)
-                        val absoluteRotationY = abs(animatedRotationY)
+        CardView {
+            Image(
+                painter = painterResource(id = R.drawable.card),
+                contentScale = ContentScale.FillBounds,
+                contentDescription = "card",
+                modifier = Modifier
+                    .graphicsLayer(
+                        rotationX = animatedRotationX,
+                        rotationY = animatedRotationY,
+                    )
+                    .transformable(state = transformState)
+                    .align(alignment = Alignment.Center)
+                    .fillMaxSize()
+                    .aspectRatio(CARD_WIDTH_RATIO / CARD_HEIGHT_RATIO)
+                    .padding(32.dp)
+                    .clip(RoundedCornerShape(15.dp))
+                    .drawWithCache {
+                        onDrawWithContent {
+                            drawContent()
+                            val absoluteRotationX = abs(animatedRotationX)
+                            val absoluteRotationY = abs(animatedRotationY)
 
-                        val overlayAlpha = (absoluteRotationX + absoluteRotationY).interpolateRange(
-                            initialRange = 0f..MAX_ROTATION * 2f,
-                            finalRange = 0f..1f
-                        )
+                            val overlayAlpha =
+                                (absoluteRotationX + absoluteRotationY).interpolateRange(
+                                    initialRange = 0f..MAX_ROTATION * 2f,
+                                    finalRange = 0f..1f
+                                )
 
-                        val xOffset = animatedRotationX.interpolateRange(
-                            initialRange = MIN_ROTATION..MAX_ROTATION,
-                            finalRange = -OVERLAY_JITTER..OVERLAY_JITTER
-                        ).toInt()
-                        val yOffset = animatedRotationY.interpolateRange(
-                            initialRange = MIN_ROTATION..MAX_ROTATION,
-                            finalRange = -OVERLAY_JITTER..OVERLAY_JITTER
-                        ).toInt()
+                            val xOffset = animatedRotationX
+                                .interpolateRange(
+                                    initialRange = MIN_ROTATION..MAX_ROTATION,
+                                    finalRange = -OVERLAY_JITTER..OVERLAY_JITTER
+                                )
+                                .toInt()
+                            val yOffset = animatedRotationY
+                                .interpolateRange(
+                                    initialRange = MIN_ROTATION..MAX_ROTATION,
+                                    finalRange = -OVERLAY_JITTER..OVERLAY_JITTER
+                                )
+                                .toInt()
 
-                        val overlayOffset = IntOffset(
-                            x = xOffset - OVERLAY_JITTER.toInt(),
-                            y = yOffset - OVERLAY_JITTER.toInt(),
-                        )
+                            val overlayOffset = IntOffset(
+                                x = xOffset - OVERLAY_JITTER.toInt(),
+                                y = yOffset - OVERLAY_JITTER.toInt(),
+                            )
 
-                        drawImage(
-                            image = overlay,
-                            alpha = overlayAlpha,
-                            dstOffset = overlayOffset,
-                            dstSize = IntSize(
-                                width = size.width.toInt() + OVERLAY_JITTER.toInt() * 2,
-                                height = size.height.toInt() + OVERLAY_JITTER.toInt() * 2,
-                            ),
-                            blendMode = BlendMode.Overlay,
-                        )
+                            drawImage(
+                                image = overlay,
+                                alpha = overlayAlpha,
+                                dstOffset = overlayOffset,
+                                dstSize = IntSize(
+                                    width = size.width.toInt() + OVERLAY_JITTER.toInt() * 2,
+                                    height = size.height.toInt() + OVERLAY_JITTER.toInt() * 2,
+                                ),
+                                blendMode = BlendMode.Overlay,
+                            )
+                        }
                     }
-                }
-        )
+            )
+        }
+
         Column(
             modifier = Modifier.align(alignment = Alignment.BottomCenter)
         ) {
@@ -179,6 +191,23 @@ fun CardComponent(modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+/**
+ * Disables hardware acceleration on API below 28 due to limitations rendering the OVERLAY blend mode.
+ */
+@Composable
+private fun CardView(content: @Composable () -> Unit) {
+    AndroidView(
+        factory = { context ->
+            ComposeView(context).apply {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+                    setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+                }
+                setContent(content)
+            }
+        },
+    )
 }
 
 fun Float.interpolateRange(
