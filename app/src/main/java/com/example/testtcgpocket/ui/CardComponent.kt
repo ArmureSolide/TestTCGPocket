@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,11 +44,23 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.example.testtcgpocket.R
 import kotlin.math.abs
 
-const val MIN_ROTATION = -5f
-const val MAX_ROTATION = 5f
+const val ROTATION_X = 5f
+const val ROTATION_Y = 10f
+const val ROTATION_Z = 2.5f
 const val CARD_WIDTH_RATIO = 2.5f
 const val CARD_HEIGHT_RATIO = 3.5f
 const val OVERLAY_JITTER = 100f
+
+private data class Rotation(
+    val x: Float,
+    val y: Float,
+    val z: Float,
+) {
+    companion object {
+        @Stable
+        val Zero = Rotation(x = 0.0f, y = 0.0f, z = 0.0f)
+    }
+}
 
 @Composable
 fun CardComponent(modifier: Modifier = Modifier) {
@@ -55,7 +68,7 @@ fun CardComponent(modifier: Modifier = Modifier) {
     val configuration = LocalConfiguration.current
 
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
-    var rotationOffset by remember { mutableStateOf(Offset.Zero) }
+    var rotation by remember { mutableStateOf(Rotation.Zero) }
     val transformState = rememberTransformableState { _, offsetChange, _ ->
         val (width, height) = with(density) {
             val ratio = CARD_WIDTH_RATIO / CARD_HEIGHT_RATIO
@@ -64,10 +77,10 @@ fun CardComponent(modifier: Modifier = Modifier) {
             width to height
         }
 
-        val maxXOffset = (width / 4f)
+        val maxXOffset = (width / 8f)
         val minXOffset = -maxXOffset
 
-        val maxYOffset = (height / 4f)
+        val maxYOffset = (height / 8f)
         val minYOffset = -maxYOffset
 
         dragOffset = Offset(
@@ -81,14 +94,21 @@ fun CardComponent(modifier: Modifier = Modifier) {
             ),
         )
 
-        rotationOffset = Offset(
+        rotation = Rotation(
             x = -dragOffset.y.interpolateRange(
                 initialRange = minYOffset..maxYOffset,
-                finalRange = MIN_ROTATION..MAX_ROTATION,
+                finalRange = -ROTATION_X..ROTATION_X,
             ),
             y = dragOffset.x.interpolateRange(
                 initialRange = minXOffset..maxXOffset,
-                finalRange = MIN_ROTATION..MAX_ROTATION,
+                finalRange = -ROTATION_Y..ROTATION_Y,
+            ),
+            z = (-rotation.x * rotation.y).coerceIn(
+                minimumValue = -(ROTATION_X * ROTATION_Y),
+                maximumValue = ROTATION_X * ROTATION_Y,
+            ).interpolateRange(
+                initialRange = -(ROTATION_X * ROTATION_Y)..(ROTATION_X * ROTATION_Y),
+                finalRange = -ROTATION_Z..ROTATION_Z,
             ),
         )
     }
@@ -96,18 +116,23 @@ fun CardComponent(modifier: Modifier = Modifier) {
     LaunchedEffect(transformState.isTransformInProgress) {
         if (!transformState.isTransformInProgress) {
             dragOffset = Offset.Zero
-            rotationOffset = Offset.Zero
+            rotation = Rotation.Zero
         }
     }
 
     val animatedRotationX by animateFloatAsState(
-        targetValue = rotationOffset.x,
+        targetValue = rotation.x,
         label = "rotationX",
     )
 
     val animatedRotationY by animateFloatAsState(
-        targetValue = rotationOffset.y,
-        label = "rotationX",
+        targetValue = rotation.y,
+        label = "rotationY",
+    )
+
+    val animatedRotationZ by animateFloatAsState(
+        targetValue = rotation.z,
+        label = "rotationZ",
     )
 
     val overlay = ImageBitmap.imageResource(id = R.drawable.overlay)
@@ -126,12 +151,13 @@ fun CardComponent(modifier: Modifier = Modifier) {
                     .graphicsLayer(
                         rotationX = animatedRotationX,
                         rotationY = animatedRotationY,
+                        rotationZ = animatedRotationZ,
                     )
                     .transformable(state = transformState)
                     .align(alignment = Alignment.Center)
                     .fillMaxSize()
+                    .padding(64.dp)
                     .aspectRatio(CARD_WIDTH_RATIO / CARD_HEIGHT_RATIO)
-                    .padding(32.dp)
                     .clip(RoundedCornerShape(15.dp))
                     .drawWithCache {
                         onDrawWithContent {
@@ -141,19 +167,19 @@ fun CardComponent(modifier: Modifier = Modifier) {
 
                             val overlayAlpha =
                                 (absoluteRotationX + absoluteRotationY).interpolateRange(
-                                    initialRange = 0f..MAX_ROTATION * 2f,
+                                    initialRange = 0f..ROTATION_X + ROTATION_Y,
                                     finalRange = 0f..1f
                                 )
 
                             val xOffset = animatedRotationX
                                 .interpolateRange(
-                                    initialRange = MIN_ROTATION..MAX_ROTATION,
+                                    initialRange = -ROTATION_X..ROTATION_X,
                                     finalRange = -OVERLAY_JITTER..OVERLAY_JITTER
                                 )
                                 .toInt()
                             val yOffset = animatedRotationY
                                 .interpolateRange(
-                                    initialRange = MIN_ROTATION..MAX_ROTATION,
+                                    initialRange = -ROTATION_Y..ROTATION_Y,
                                     finalRange = -OVERLAY_JITTER..OVERLAY_JITTER
                                 )
                                 .toInt()
@@ -186,7 +212,7 @@ fun CardComponent(modifier: Modifier = Modifier) {
                 color = Color.White,
             )
             Text(
-                text = "Rotation : x : ${rotationOffset.x} | y : ${rotationOffset.y}",
+                text = "Rotation : x : ${rotation.x} | y : ${rotation.y} | z : ${rotation.z}",
                 color = Color.White,
             )
         }
